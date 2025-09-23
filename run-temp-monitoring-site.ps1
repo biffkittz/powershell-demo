@@ -1,8 +1,8 @@
 
 <#
 .SYNOPSIS
-    Script sets up monitoring website infrastructure in AWS and Cloudflare, runs it for a specified duration,
-        then tears down the infrastructure
+    Script to set up monitoring website infrastructure in AWS and Cloudflare, run it for a specified duration,
+        then tear down the infrastructure
 
 .DESCRIPTION
     This script creates S3 buckets for storing monitoring data and photos,
