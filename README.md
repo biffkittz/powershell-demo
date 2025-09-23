@@ -1,8 +1,21 @@
 # PowerShell Demo
 1. PowerShell runspaces for parallel ScriptBlock executions
 2. Integrated with AWS CLI and AWS PowerShell modules
-3. API calls made to Cloudflare using Invoke-RestMethod
+3. Various API calls made to Cloudflare using Invoke-RestMethod
 4. Text to object creation, JSON serialization/deserialization
+5. Logging and error handling
+
+#### Prerequisites
+1. Configured AWS credentials that permit S3 and EC2 operations
+2. Cloudflare credential and ZoneId for DNS management (optional)
+3. AWS CLI and AWSPowerShell.NetCore module
+4. fswebcam utlity for command-line webcam capturing
+
+#### Example invocation:
+Tested using PowerShell 7.5.3 on Debian 12
+```
+PS> ./run-temp-monitoring-site.ps1 -CloudflareToken <token> -CloudflareZoneId <zone_id>
+```
 
 #### Example Script Output:
 
@@ -41,14 +54,4 @@ upload: ./df-output.json to s3://biffkittz-monitoring-data/df-output.json
 [2025-09-23 12:31:15.620] [Info] Waiting for runspaces to complete with timeout of 30 seconds
 [2025-09-23 12:31:17.547] [Info] Deleting monitor.biffkittz.com record from Cloudflare...
 [2025-09-23 12:31:18.259] [Info] Teardown complete.
-
-StackName           CreationTime         LastUpdatedTime Capabilities StackStatus     DisableRollback
----------           ------------         --------------- ------------ -----------     ---------------
-temp-stack-216248a1 9/23/2025 4:26:12 PM                              CREATE_COMPLETE False
-
-result   : @{id=e7cf7c6caa4ac5395a72ea8a6e8b56e8}
-success  : True
-errors   : {}
-messages : {}
-
 ```
