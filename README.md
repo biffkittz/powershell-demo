@@ -11,13 +11,16 @@
 3. AWS CLI and AWSPowerShell.NetCore module
 4. fswebcam utlity for command-line webcam capturing
 
-#### Example invocation:
+#### Example invocation
 Tested using PowerShell 7.5.3 on Debian 12
 ```
 PS> ./run-temp-monitoring-site.ps1 -CloudflareToken <token> -CloudflareZoneId <zone_id>
 ```
 
-#### Example Script Output:
+#### Live Site
+<img src="https://github.com/biffkittz/powershell-demo/blob/main/monitor.png" width="300" height="500">
+
+#### Example Script Output
 
 ```
 [2025-09-23 12:26:07.287] [Info] Imported module AWSPowerShell.NetCore
