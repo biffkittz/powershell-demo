@@ -176,7 +176,28 @@ Resources:
                 <div id="monitoring-data"></div>
               </div>
 
+              <div id="cpu-data"></div>
+
               <script>
+                  async function fetchCpuData() {
+                    try {
+                      fetch('https://biffkittz-monitoring-data.s3.us-east-2.amazonaws.com/cpu-statistics.txt')
+                        .then(response => {
+                          if (!response.ok) {
+                            console.log("Failed to fetch cpu data");
+                          }
+                          
+                          return response.text();
+                        }).then(data => {
+                          console.log(data);
+                          const cpuDataContainer = document.getElementById("cpu-data");
+                          cpuDataContainer.textContent = data;
+                        })
+                      } catch (error) {
+                        console.log(error);
+                      }
+                  }
+
                   async function fetchMonitoringData() {
                       try {
                           fetch('https://biffkittz-monitoring-data.s3.us-east-2.amazonaws.com/df-output.json')
@@ -232,6 +253,7 @@ Resources:
 
                   // Fetch data on page load
                   fetchMonitoringData();
+                  fetchCpuData();
               </script>
           </body>
           </html>
