@@ -211,13 +211,14 @@ Resources:
                               return response.json();
                             })
                             .then(data => {
-                              const dataContainer = document.getElementById("file-system-data);
+                              const dataContainer = document.getElementById("file-system-data");
                               const table = document.createElement('table');
                               table.style.borderCollapse = 'collapse';
 
                               // Create table header
                               const thead = document.createElement('thead');
                               const headerRow = document.createElement('tr');
+
                               for (const key in data[0]) {
                                 const th = document.createElement('th');
                                 th.textContent = key.charAt(0).toUpperCase() + key.slice(1); // Capitalize first letter
@@ -225,6 +226,7 @@ Resources:
                                 th.style.padding = '8px';
                                 headerRow.appendChild(th);
                               }
+
                               thead.appendChild(headerRow);
                               table.appendChild(thead);
 
@@ -232,8 +234,10 @@ Resources:
 
                               // Create table body
                               const tbody = document.createElement('tbody');
+                              
                               data.forEach(rowData => {
                                 const tr = document.createElement('tr');
+
                                 for (const key in rowData) {
                                   const td = document.createElement('td');
                                   td.textContent = rowData[key];
@@ -241,8 +245,10 @@ Resources:
                                   td.style.padding = '8px';
                                   tr.appendChild(td);
                                 }
+
                                 tbody.appendChild(tr);
                               });
+
                               table.appendChild(tbody);
 
                               dataContainer.appendChild(table);
