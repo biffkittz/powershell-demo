@@ -225,10 +225,14 @@ $BucketCreationScriptBlock = {
         [string] $S3Region
     )
 
-    aws s3api create-bucket `
+    $null = aws s3api create-bucket `
         --bucket $BucketName `
         --region $S3Region `
-        --create-bucket-configuration LocationConstraint=$S3Region *> Out-Null
+        --create-bucket-configuration LocationConstraint=$S3Region
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to call aws s3api create-bucket: $LASTEXITCODE"
+    }
 
     Write-Message -MessageType Info "Attempted to create bucket $BucketName"
 }
@@ -262,10 +266,15 @@ Wait-ForRunspacesCompletionAndThrowOnTimeout `
 #region Configure S3 bucket policies and CORS
 
 # Allow public access to monitoring data bucket
+
 aws s3api put-public-access-block `
     --bucket biffkittz-monitoring-data `
     --public-access-block-configuration BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false `
     --region $S3Region
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to call aws s3api put-public-access-block: $LASTEXITCODE"
+}
 
 # Add bucket policy to allow public read access to objects in monitoring data bucket
 $bucketPolicyJson = @'
