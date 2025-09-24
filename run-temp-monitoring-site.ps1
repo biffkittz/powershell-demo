@@ -193,9 +193,32 @@ function Invoke-ScriptBlockPerBucketInRunspace {
 
     return $Runspaces
 }
+
+function Invoke-CpuScriptBlockInRunspace {
+    $CpuCalculationScriptBlock = {
+        $cpu_info = ./calculate-avg-cpu.sh # blocks for 10 seconds...run in background
+        return $cpu_info
+    }
+
+    $Runspace = [powershell]::Create().AddScript($CpuCalculationScriptBlock)
+
+    $Runspace.RunspacePool = $global:RunspacePool
+    return @(New-Object PSObject -Property @{
+        Runspace = $Runspace
+        State = $Runspace.BeginInvoke()
+    })
+}
+
+function Get-CpuStatisticsSync {
+    $cpu_stats = Invoke-CpuScriptBlockInRunspace
+    Wait-ForRunspacesCompletionAndThrowOnTimeout -Runspaces $cpu_stats -TimeoutSeconds 30
+    Write-Output $cpu_stats.Runspace.EndInvoke($cpu_stats.State)
+}
+
 #endregion
 
 #region Create S3 buckets in parallel using runspaces
+
 $BucketCreationScriptBlock = {
     param (
         [string] $BucketName,
@@ -348,6 +371,10 @@ try {
     Write-Message -MessageType Info "Entering run loop for $SiteRunDurationMinutes minutes..."
     while ((Get-Date) - $ScriptStartTime -lt (New-TimeSpan -Minutes $SiteRunDurationMinutes)) {
 
+        # Start some work that takes ~10 seconds to complete in a runspace, and move on to doing other things
+        #   while gathering CPU stats
+        $cpu_stats = Invoke-CpuScriptBlockInRunspace
+
         # Capture a new backyard photo using fswebcam and upload to S3
         fswebcam -r 640x480 --jpeg -D 3 -S 13 backyard.jpg *> Out-Null
         aws s3 cp /home/biffkittz/powershell/backyard.jpg "s3://biffkittz-monitoring-data/backyard.jpg" --region $S3Region
@@ -379,6 +406,11 @@ try {
 
         # upload json to S3
         aws s3 cp /home/biffkittz/powershell/df-output.json "s3://biffkittz-monitoring-data/df-output.json" --region $S3Region
+
+        # Block now, after completing the other work, above, in the main thread
+        Wait-ForRunspacesCompletionAndThrowOnTimeout -Runspaces $cpu_stats -TimeoutSeconds 15
+        $cpu_stats.Runspace.EndInvoke($cpu_stats.State) > cpu-statistics.txt
+        aws s3 cp /home/biffkittz/powershell/cpu-statistics.txt "s3://biffkittz-monitoring-data/cpu-statistics.txt" --region $S3Region
 
         Start-Sleep -Seconds 15
     }
