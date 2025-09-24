@@ -169,7 +169,7 @@ function Get-RunspacesResults {
     Write-Host $Results
 }
 
-function Invoke-ScriptBlockInRunspacePoolRunspaces {
+function Invoke-ScriptBlockPerBucketInRunspace {
     param (
         [ScriptBlock] $ScriptBlock,
         [array]       $BucketNames,
@@ -224,7 +224,7 @@ $BucketDestructionScriptBlock = {
     Write-Message Info "Attempted to destroy bucket $BucketName"
 }
 
-$BucketCreationRunspaces = Invoke-ScriptBlockInRunspacePoolRunspaces `
+$BucketCreationRunspaces = Invoke-ScriptBlockPerBucketInRunspace `
     -ScriptBlock $BucketCreationScriptBlock `
     -BucketName $BucketNames `
     -S3Region $S3Region
@@ -390,7 +390,7 @@ finally {
     aws cloudformation delete-stack --stack-name $cfnStackName
 
     Write-Message -MessageType Info "Destroying S3 buckets..."
-    $BucketDestructionRunspaces = Invoke-ScriptBlockInRunspacePoolRunspaces `
+    $BucketDestructionRunspaces = Invoke-ScriptBlockPerBucketInRunspace `
         -ScriptBlock $BucketDestructionScriptBlock `
         -BucketNames $BucketNames `
         -S3Region $S3Region
