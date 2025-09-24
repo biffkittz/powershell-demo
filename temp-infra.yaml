@@ -172,8 +172,8 @@ Resources:
               </div>
 
               <div>
-                <p>Latest memory stats:</p>
-                <div id="memory-data"></div>
+                <p>Latest file system stats:</p>
+                <div id="file-system-data"></div>
               </div>
               
               <div>
@@ -211,7 +211,7 @@ Resources:
                               return response.json();
                             })
                             .then(data => {
-                              const dataContainer = document.getElementById("memory-data");
+                              const dataContainer = document.getElementById("file-system-data);
                               const table = document.createElement('table');
                               table.style.borderCollapse = 'collapse';
 
