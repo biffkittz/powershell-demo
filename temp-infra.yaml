@@ -172,11 +172,14 @@ Resources:
               </div>
 
               <div>
-                <p>Latest system stats:</p>
-                <div id="monitoring-data"></div>
+                <p>Latest memory stats:</p>
+                <div id="memory-data"></div>
               </div>
-
-              <div id="cpu-data"></div>
+              
+              <div>
+                <p>Latest cpu stats:</p>
+                <div id="cpu-data"></div>
+              </div>
 
               <script>
                   async function fetchCpuData() {
@@ -208,7 +211,7 @@ Resources:
                               return response.json();
                             })
                             .then(data => {
-                              const dataContainer = document.getElementById("monitoring-data");
+                              const dataContainer = document.getElementById("memory-data");
                               const table = document.createElement('table');
                               table.style.borderCollapse = 'collapse';
 
