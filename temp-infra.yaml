@@ -191,7 +191,7 @@ Resources:
                         }).then(data => {
                           console.log(data);
                           const cpuDataContainer = document.getElementById("cpu-data");
-                          cpuDataContainer.textContent = data;
+                          cpuDataContainer.textContent = "CPU:" + data;
                         })
                       } catch (error) {
                         console.log(error);
