@@ -251,33 +251,35 @@ $BucketDestructionScriptBlock = {
     Write-Message Info "Attempted to destroy bucket $BucketName"
 }
 
-$BucketCreationRunspaces = Invoke-ScriptBlockPerBucketInRunspace `
-    -ScriptBlock $BucketCreationScriptBlock `
-    -BucketName $BucketNames `
-    -S3Region $S3Region
+try {
 
-Wait-ForRunspacesCompletionAndThrowOnTimeout `
-    -Runspaces $BucketCreationRunspaces `
-    -TimeoutSeconds 30 `
-    -ErrorMessage "Timeout waiting for BucketCreationRunspaces to complete"
-#endregion
+    $BucketCreationRunspaces = Invoke-ScriptBlockPerBucketInRunspace `
+        -ScriptBlock $BucketCreationScriptBlock `
+        -BucketName $BucketNames `
+        -S3Region $S3Region
+
+    Wait-ForRunspacesCompletionAndThrowOnTimeout `
+        -Runspaces $BucketCreationRunspaces `
+        -TimeoutSeconds 30 `
+        -ErrorMessage "Timeout waiting for BucketCreationRunspaces to complete"
+    #endregion
 
 
-#region Configure S3 bucket policies and CORS
+    #region Configure S3 bucket policies and CORS
 
-# Allow public access to monitoring data bucket
+    # Allow public access to monitoring data bucket
 
-aws s3api put-public-access-block `
-    --bucket biffkittz-monitoring-data `
-    --public-access-block-configuration BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false `
-    --region $S3Region
+    aws s3api put-public-access-block `
+        --bucket biffkittz-monitoring-data `
+        --public-access-block-configuration BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false `
+        --region $S3Region
 
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to call aws s3api put-public-access-block: $LASTEXITCODE"
-}
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to call aws s3api put-public-access-block: $LASTEXITCODE"
+    }
 
-# Add bucket policy to allow public read access to objects in monitoring data bucket
-$bucketPolicyJson = @'
+    # Add bucket policy to allow public read access to objects in monitoring data bucket
+    $bucketPolicyJson = @'
 {
     "Version": "2012-10-17",
     "Statement": [
@@ -296,87 +298,87 @@ $bucketPolicyJson = @'
 }
 '@
 
-Write-S3BucketPolicy `
-    -BucketName "biffkittz-monitoring-data" `
-    -Policy $bucketPolicyJson `
-    -Region $S3Region
+    Write-S3BucketPolicy `
+        -BucketName "biffkittz-monitoring-data" `
+        -Policy $bucketPolicyJson `
+        -Region $S3Region
 
-# Configure CORS for monitoring data bucket
-aws s3api put-bucket-cors `
-    --bucket biffkittz-monitoring-data `
-    --cors-configuration file://cors.json `
-    --region $S3Region
+    # Configure CORS for monitoring data bucket
+    aws s3api put-bucket-cors `
+        --bucket biffkittz-monitoring-data `
+        --cors-configuration file://cors.json `
+        --region $S3Region
 
-#endregion
+    #endregion
 
-#region Create EC2 infra using CloudFormation
+    #region Create EC2 infra using CloudFormation
 
-# Create EC2 infra to host the monitoring site using CloudFormation
-$cfnStackName = "temp-stack-$(([Guid]::NewGuid().ToString().Substring(0, 8)))"
-$(aws cloudformation create-stack --stack-name $cfnStackName --template-body file://temp-infra.yaml)
+    # Create EC2 infra to host the monitoring site using CloudFormation
+    $cfnStackName = "temp-stack-$(([Guid]::NewGuid().ToString().Substring(0, 8)))"
+    $(aws cloudformation create-stack --stack-name $cfnStackName --template-body file://temp-infra.yaml)
 
-Wait-CFNStack -StackName $cfnStackName -Status "CREATE_COMPLETE" -Timeout 300
+    Wait-CFNStack -StackName $cfnStackName -Status "CREATE_COMPLETE" -Timeout 300
 
-$stackOutputs = (aws cloudformation describe-stacks --stack-name $cfnStackName --query "Stacks[0].Outputs" | ConvertFrom-Json)
-$stackOutputMap = @{}
-foreach ($output in $stackOutputs) {
-    $stackOutputMap[$output.OutputKey] = $output.OutputValue
-}
-
-Write-Host "**************************************************"
-Write-Message -MessageType Info "WebsiteURL: $($stackOutputMap["WebsiteURL"])"
-Write-Host "**************************************************"
-#endregion
-
-#region Cloudflare DNS Record Update
-$CloudflareDnsRecordId = $null
-
-# Only attempt DNS update if CloudflareToken and CloudflareZoneId are provided
-if ($CloudflareToken -and $CloudflareZoneId) {
-    Write-Message -MessageType Info "Updating Cloudflare DNS record for monitoring site..."
-
-    $CloudflareRecordName = "monitor.biffkittz.com"
-
-    # Parse IP address of EC2 instance from WebsiteURL output returned by CloudFormation
-    $IPAddress = $stackOutputMap["WebsiteURL"].Replace("http://", "").Replace("/", "")
-
-    # Prepare DNS record payload
-    $dnsRecordPayload = @{
-        name = $CloudflareRecordName
-        type = "A"
-        content = $IPAddress
-        ttl = 120
-        proxied = $false
-    } | ConvertTo-Json
-
-    # Either update or create the DNS record, storing the record ID for later deletion
-    $existingRecordResponse = Invoke-RestMethod -Method Get `
-        -Uri "https://api.cloudflare.com/client/v4/zones/$CloudflareZoneId/dns_records?name=$CloudflareRecordName" `
-        -Headers @{ "Authorization" = "Bearer $CloudflareToken"; "Content-Type" = "application/json" }
-
-    if ($existingRecordResponse.result.Count -gt 0) {
-        $CloudflareDnsRecordId = $existingRecordResponse.result[0].id
-
-        Invoke-RestMethod -Method Put `
-            -Uri "https://api.cloudflare.com/client/v4/zones/$CloudflareZoneId/dns_records/$recordId" `
-            -Headers @{ "Authorization" = "Bearer $CloudflareToken"; "Content-Type" = "application/json" } `
-            -Body $dnsRecordPayload
-    }
-    else {
-        $newRecordResponse = Invoke-RestMethod -Method Post `
-            -Uri "https://api.cloudflare.com/client/v4/zones/$CloudflareZoneId/dns_records" `
-            -Headers @{ "Authorization" = "Bearer $CloudflareToken"; "Content-Type" = "application/json" } `
-            -Body $dnsRecordPayload
-
-        $CloudflareDnsRecordId = $newRecordResponse.result[0].id
+    $stackOutputs = (aws cloudformation describe-stacks --stack-name $cfnStackName --query "Stacks[0].Outputs" | ConvertFrom-Json)
+    $stackOutputMap = @{}
+    foreach ($output in $stackOutputs) {
+        $stackOutputMap[$output.OutputKey] = $output.OutputValue
     }
 
-    Write-Message -MessageType Info "Updated Cloudflare DNS record for monitor.biffkittz.com to point to $IPAddress"
-}
-#endregion
+    Write-Host "**************************************************"
+    Write-Message -MessageType Info "WebsiteURL: $($stackOutputMap["WebsiteURL"])"
+    Write-Host "**************************************************"
+    #endregion
 
-#region Main run loop
-try {
+    #region Cloudflare DNS Record Update
+    $CloudflareDnsRecordId = $null
+
+    # Only attempt DNS update if CloudflareToken and CloudflareZoneId are provided
+    if ($CloudflareToken -and $CloudflareZoneId) {
+        Write-Message -MessageType Info "Updating Cloudflare DNS record for monitoring site..."
+
+        $CloudflareRecordName = "monitor.biffkittz.com"
+
+        # Parse IP address of EC2 instance from WebsiteURL output returned by CloudFormation
+        $IPAddress = $stackOutputMap["WebsiteURL"].Replace("http://", "").Replace("/", "")
+
+        # Prepare DNS record payload
+        $dnsRecordPayload = @{
+            name = $CloudflareRecordName
+            type = "A"
+            content = $IPAddress
+            ttl = 120
+            proxied = $false
+        } | ConvertTo-Json
+
+        # Either update or create the DNS record, storing the record ID for later deletion
+        $existingRecordResponse = Invoke-RestMethod -Method Get `
+            -Uri "https://api.cloudflare.com/client/v4/zones/$CloudflareZoneId/dns_records?name=$CloudflareRecordName" `
+            -Headers @{ "Authorization" = "Bearer $CloudflareToken"; "Content-Type" = "application/json" }
+
+        if ($existingRecordResponse.result.Count -gt 0) {
+            $CloudflareDnsRecordId = $existingRecordResponse.result[0].id
+
+            Invoke-RestMethod -Method Put `
+                -Uri "https://api.cloudflare.com/client/v4/zones/$CloudflareZoneId/dns_records/$recordId" `
+                -Headers @{ "Authorization" = "Bearer $CloudflareToken"; "Content-Type" = "application/json" } `
+                -Body $dnsRecordPayload
+        }
+        else {
+            $newRecordResponse = Invoke-RestMethod -Method Post `
+                -Uri "https://api.cloudflare.com/client/v4/zones/$CloudflareZoneId/dns_records" `
+                -Headers @{ "Authorization" = "Bearer $CloudflareToken"; "Content-Type" = "application/json" } `
+                -Body $dnsRecordPayload
+
+            $CloudflareDnsRecordId = $newRecordResponse.result[0].id
+        }
+
+        Write-Message -MessageType Info "Updated Cloudflare DNS record for monitor.biffkittz.com to point to $IPAddress"
+    }
+    #endregion
+
+    #region Main run loop
+
     Write-Message -MessageType Info "Entering run loop for $SiteRunDurationMinutes minutes..."
     while ((Get-Date) - $ScriptStartTime -lt (New-TimeSpan -Minutes $SiteRunDurationMinutes)) {
 
@@ -384,9 +386,13 @@ try {
         #   while gathering CPU stats
         $cpu_stats = Invoke-CpuScriptBlockInRunspace
 
-        # Capture a new backyard photo using fswebcam and upload to S3
-        fswebcam -r 640x480 --jpeg -D 3 -S 13 backyard.jpg *> Out-Null
-        aws s3 cp /home/biffkittz/powershell/backyard.jpg "s3://biffkittz-monitoring-data/backyard.jpg" --region $S3Region
+        # Capture a new backyard photo using fswebcam and upload to S3 (if fswebcam installed)
+        if (which fswebcam) {
+            fswebcam -r 640x480 --jpeg -D 3 -S 13 backyard.jpg *> Out-Null
+            aws s3 cp /home/biffkittz/powershell/backyard.jpg "s3://biffkittz-monitoring-data/backyard.jpg" --region $S3Region
+        } else {
+            Write-Message -MessageType Warning -Message "fswebcam not installed, skipped image upload"
+        }
 
         # Query some "monitoring" data, parse lines into object, write to json file, and upload to S3
         df -h > df-output.txt
