@@ -1,10 +1,11 @@
-# PowerShell Demo
+# PowerShell Demo Features
 1. PowerShell runspaces for parallel ScriptBlock executions
 2. Runspace progress report output during background execution
-3. Integrated with AWS CLI and AWS PowerShell modules
-4. Various API calls made to Cloudflare using Invoke-RestMethod
+3. AWS CLI and AWS PowerShell module integration
+4. Cloudflare API integration using Invoke-RestMethod for DNS record manipulation
 5. Text to object creation, JSON serialization/deserialization
-6. Logging and error handling
+6. Bash script execution from PowerShell
+7. Logging and error handling
 
 #### Prerequisites
 1. Configured AWS credentials that permit S3 and EC2 operations
