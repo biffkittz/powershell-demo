@@ -137,6 +137,7 @@ function Wait-ForRunspacesCompletionAndThrowOnTimeout {
     )
 
     $StartTime = Get-Date
+    $millisecondElapsedCount = 10
 
     Write-Message `
         -MessageType "Info" `
@@ -148,7 +149,17 @@ function Wait-ForRunspacesCompletionAndThrowOnTimeout {
             throw $ErrorMessage ?? "Timeout waiting for runspaces to complete"
         }
 
+        # Output progress, if any, every second
+        if ($millisecondElapsedCount % 1000 -eq 0) {
+            foreach ($runspace in $Runspaces) {
+                if ($runspace.ProgressHash -and $runspace.ProgressHash['ProgressReport']) {
+                    Write-Message -MessageType Info -Message $($runspace.ProgressHash['ProgressReport'])
+                }
+            }
+        }
+
         Start-Sleep -Milliseconds 10
+        $millisecondElapsedCount += 10
     }
 }
 
@@ -196,18 +207,38 @@ function Invoke-ScriptBlockPerBucketInRunspace {
 
 function Invoke-CpuScriptBlockInRunspace {
     $CpuCalculationScriptBlock = {
+        param($progressHash)
+
+        $progressHash['ProgressReport'] = "Running average CPU calculation..."
         $cpu_info = ./calculate-avg-cpu.sh # blocks for 10 seconds...run in background
+        $progressHash['ProgressReport'] = $cpu_info
+
+        Start-Sleep -Seconds 2
         return $cpu_info
     }
 
+    $progressHash = [hashtable]::Synchronized(@{})
     $Runspace = [powershell]::Create().AddScript($CpuCalculationScriptBlock)
-
+    $null = $Runspace.AddArgument($progressHash)
     $Runspace.RunspacePool = $global:RunspacePool
+    #$Runspace.SessionStateProxy.SetVariable('progressHash', $progressHash)
+
     return @(New-Object PSObject -Property @{
         Runspace = $Runspace
         State = $Runspace.BeginInvoke()
+        ProgressHash = $progressHash
     })
 }
+
+# $cpuWork = Invoke-CpuScriptBlockInRunspace
+
+# while (-not $cpuWork.State.IsCompleted) {
+#     if ($cpuWork.ProgressHash['ProgressReport']) {
+#         Write-Message -MessageType Info -Message $($cpuWork.ProgressHash['ProgressReport'])
+#     }
+
+#     Start-Sleep -Milliseconds 500
+# }
 
 function Get-CpuStatisticsSync {
     $cpu_stats = Invoke-CpuScriptBlockInRunspace
