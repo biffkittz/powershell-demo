@@ -163,7 +163,6 @@ Resources:
           <body>
               <div class="container">
                   <h1>You are monitoring!</h1>
-                  <p>Site refreshes every 15 seconds with updated data</p>
               </div>
 
               <div>
@@ -179,6 +178,10 @@ Resources:
               <div>
                 <p>Latest cpu stats:</p>
                 <div id="cpu-data"></div>
+              </div>
+
+              <div>
+                <p>Site refreshes every 15 seconds with updated data</p>
               </div>
 
               <script>
@@ -234,7 +237,7 @@ Resources:
 
                               // Create table body
                               const tbody = document.createElement('tbody');
-                              
+
                               data.forEach(rowData => {
                                 const tr = document.createElement('tr');
 
