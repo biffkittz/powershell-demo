@@ -1,7 +1,7 @@
 
 <#
 .SYNOPSIS
-    Script to set up monitoring website infrastructure in AWS and Cloudflare, run it for a specified duration,
+    Set up monitoring website infrastructure in AWS and Cloudflare, run it for a specified duration,
         then tear down the infrastructure
 
 .DESCRIPTION
@@ -32,6 +32,9 @@
 .PARAMETER S3Region
     AWS region where S3 infra will be created
 
+.PARAMETER WebsiteSubdomain
+    Subdomain from which to create an A record to point to the EC2 instance's public IP
+
 .PARAMETER CloudflareToken
     Cloudflare API token for DNS records manipulation. If not provided, DNS updates are skipped, but site will still be accessible at the IP address.
 
@@ -49,6 +52,7 @@ param (
     [int]    $SiteRunDurationMinutes = 5,
     [int]    $RunspacesMaxCount = 5,
     [string] $S3Region = "us-east-2",
+    [string] $WebsiteSubdomain = "monitor",
     [string] $CloudflareToken,
     [string] $CloudflareZoneId
 )
@@ -368,7 +372,7 @@ try {
     if ($CloudflareToken -and $CloudflareZoneId) {
         Write-Message -MessageType Info "Updating Cloudflare DNS record for monitoring site..."
 
-        $CloudflareRecordName = "monitor.biffkittz.com"
+        $CloudflareRecordName = "$WebsiteSubdomain.biffkittz.com"
 
         # Parse IP address of EC2 instance from WebsiteURL output returned by CloudFormation
         $IPAddress = $stackOutputMap["WebsiteURL"].Replace("http://", "").Replace("/", "")
@@ -404,7 +408,7 @@ try {
             $CloudflareDnsRecordId = $newRecordResponse.result[0].id
         }
 
-        Write-Message -MessageType Info "Updated Cloudflare DNS record for monitor.biffkittz.com to point to $IPAddress"
+        Write-Message -MessageType Info "Updated Cloudflare DNS record for $WebsiteSubdomain.biffkittz.com to point to $IPAddress"
     }
     #endregion
 
@@ -455,7 +459,7 @@ try {
 
         # Block now, after completing the other work, above, in the main thread
         Wait-ForRunspacesCompletionAndThrowOnTimeout -Runspaces $cpu_stats -TimeoutSeconds 15
-        $cpu_stats.Runspace.EndInvoke($cpu_stats.State) > cpu-statistics.txt
+        $cpu_stats.Runspace.EndInvoke($cpu_stats.State) + " [$(Get-Date -Format "MM/dd/yyyy HH:mm:ss")]" > cpu-statistics.txt
         aws s3 cp /home/biffkittz/powershell/cpu-statistics.txt "s3://biffkittz-monitoring-data/cpu-statistics.txt" --region $S3Region
 
         Start-Sleep -Seconds 15
@@ -479,7 +483,7 @@ finally {
         -ErrorMessage "Timeout waiting for BucketDestructionRunspaces to complete"
 
     if ($CloudflareDnsRecordId) {
-        Write-Message -MessageType Info "Deleting monitor.biffkittz.com record from Cloudflare..."
+        Write-Message -MessageType Info "Deleting $WebsiteSubdomain.biffkittz.com record from Cloudflare..."
         Invoke-RestMethod -Method Delete `
             -Uri "https://api.cloudflare.com/client/v4/zones/$CloudflareZoneId/dns_records/$CloudflareDnsRecordId" `
             -Headers @{ "Authorization" = "Bearer $CloudflareToken"; "Content-Type" = "application/json" }
