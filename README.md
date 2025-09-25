@@ -10,7 +10,7 @@
 1. Configured AWS credentials that permit S3 and EC2 operations
 2. Cloudflare credential and ZoneId for DNS management (optional)
 3. AWS CLI and AWSPowerShell.NetCore module
-4. fswebcam utlity for command-line webcam capturing (and a physical webcam to capture from)
+4. fswebcam utlity for command-line webcam capturing (and a physical webcam from which to capture)
 
 #### Example invocation
 Tested using PowerShell 7.5.3 on Debian 12
